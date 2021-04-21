@@ -1,6 +1,6 @@
 from mesa import Model
 from mesa.time import RandomActivation
-from mesa.space import Grid
+from mesa.space import MultiGrid
 
 from mesa.visualization.modules import CanvasGrid
 from mesa.visualization.ModularVisualization import ModularServer
@@ -10,14 +10,14 @@ import random
 import math
 
 import numpy as np
-from agent import SlimyAgent
+from agent import SlimyAgent, cAMP
 
 ''' This is the model where I am playing around with the step function, which I believe to be the problem. '''
 
 class SlimeModel(Model):
     def __init__(self, height, width):
         # number of agents per tile
-        self.n = 2
+        self.n = 1
         # rate of cAMP decay
         self.k = .01
         # diffusion constant of cAMP
@@ -32,9 +32,9 @@ class SlimeModel(Model):
         self.w = 2
 
         # height of grid
-        self.height = 200
+        self.height = 20
         # width of grid
-        self.width = 200
+        self.width = 20
 
         # counter for generating sequential unique id's
         self.j = 0
@@ -42,28 +42,39 @@ class SlimeModel(Model):
         # Create randomly ordered scheduler
         self.schedule = RandomActivation(self)
         # Create grid
-        self.grid = Grid(self.height, self.width, torus=False)
+        self.grid = MultiGrid(self.height, self.width, torus=False)
 
         # Going to add this functionality once the visualization gets going.
 #        self.datacollector = DataCollector({})
 
-        # Initialize list of agents
+        # Initialize list of cells and slime agents
+        self.cells = list()
         self.agents = list()
 
+#        x, y = 0, 0
         # Initial loop to create agents and fill agents list with them
         for (contents, x, y) in self.grid.coord_iter():
             # Secondary loop
-            for i in range(1):
+            for i in range(10):
                 if(random.random() < .5):
-                # Create object of type SlimyAgent
-                    ag = SlimyAgent(self.j, random.randint(0, self.w), random.randint(0, self.w))
-                # Add new SlimyAgent object to agents list
+                    #x, y = random.randint(0, self.w), random.randint(0, self.w)
+                    # Create object of type cAMP
+                    cell = cAMP([x, y], self, self.j, 0)
+                    # Add random amount of cAMP to cell (<1)
+                    cell.add(random.random())
+                    # Add new Tile object to cells list
+                    self.cells.append(cell)
+                    # Place cAMP onto grid at coordinates x, y
+                    self.grid.place_agent(cell, tuple([x, y]))
+                    # Create object of type SlimyAgent
+                    ag = SlimyAgent([x, y], self, self.j)
+                    # Add new SlimyAgent object to agents list
                     self.agents.append(ag)
-                # Place agent onto grid at coordinates x, y
-                    self.grid._place_agent((x, y), ag)
-                # Add agent to schedule
+                    # Place agent onto grid at coordinates x, y
+                    self.grid.place_agent(ag, tuple([x, y]))
+                    # Add agent to schedule
                     self.schedule.add(ag)
-                # Increment j (unique_id variable)
+                    # Increment j (unique_id variable)
                     self.j += 1
 
         # Create environment variable as array filled with zeros w x w
@@ -71,7 +82,7 @@ class SlimeModel(Model):
         # Create next environemnt variable as array filled with zeros and dimensions w x w
         self.nextenv = np.zeros([self.w, self.w])
         # Print out number of agents
-        print(self.j)
+        print("# of agents:", self.j)
 
         self.running = True
 
@@ -81,6 +92,41 @@ class SlimeModel(Model):
             in the agent class, but my principle struggle is dealing with the env aspects of Sayama's code
     '''
     def step(self):
+        sNeighbors = list()
+        cNeighbors = list()
+        neighbors = list()
+        lap = 0
+        amt = 0
+
+        # Iterate thorugh every grid spot (cuasing inf loop?)
+        for (contents, x, y) in self.grid.coord_iter():
+            # Iterate through all contents of a grid cell
+            for obj in contents:
+                # Proceed if objecti s a cAMP molecule
+                if type(obj) is cAMP:
+                    # Get all neighbors (excuding self)
+                    neighbors = obj.getNeighbors()
+                    # Examine each neighbor
+                    for neighbor in neighbors:
+                        # Add SlimyAgent neighbors to sNeighbors and cAMP agents to cNeighbors
+                        if type(neighbor) is SlimyAgent:
+                            sNeighbors.append(neighbor)
+                        else:
+                            cNeighbors.append(neighbor)
+                    # Loop through each cAMP neighbor
+                    for mol in cNeighbors:
+                        # Get amount of cAMP
+                        amt = mol.getAmt()
+                        # Add amount to variable lap
+                        lap += amt
+                    # Get center object's amount of cAMP
+                    amt = obj.getAmt()
+                    # Calculate laplacian
+                    lap = (lap - 4 * amt)/(self.Dh**2)
+                    print(lap)
+                    exit()
+                    
+
         self.schedule.step()
 
 ''' Server elements '''
@@ -94,7 +140,7 @@ def cAMP_portrayal(molecule):
     # Setting y coordinate of agent in portrayal dict
     portrayal["y"] = SlimyAgent.getY
     # Setting agent color to hex 43566c (a lightish navy)
-    portrayal["color"] = "43566c"
+    portrayal["color"] = "#43566c"
 
     return portrayal
 
