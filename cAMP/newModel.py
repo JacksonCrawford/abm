@@ -51,31 +51,29 @@ class SlimeModel(Model):
         self.cells = list()
         self.agents = list()
 
-#        x, y = 0, 0
         # Initial loop to create agents and fill agents list with them
         for (contents, x, y) in self.grid.coord_iter():
-            # Secondary loop
-            for i in range(10):
-                if(random.random() < .5):
-                    #x, y = random.randint(0, self.w), random.randint(0, self.w)
-                    # Create object of type cAMP
-                    cell = cAMP([x, y], self, self.j, 0)
-                    # Add random amount of cAMP to cell (<1)
-                    cell.add(random.random())
-                    # Add new Tile object to cells list
-                    self.cells.append(cell)
-                    # Place cAMP onto grid at coordinates x, y
-                    self.grid.place_agent(cell, tuple([x, y]))
-                    # Create object of type SlimyAgent
-                    ag = SlimyAgent([x, y], self, self.j)
-                    # Add new SlimyAgent object to agents list
-                    self.agents.append(ag)
-                    # Place agent onto grid at coordinates x, y
-                    self.grid.place_agent(ag, tuple([x, y]))
-                    # Add agent to schedule
-                    self.schedule.add(ag)
-                    # Increment j (unique_id variable)
-                    self.j += 1
+            # Create object of type cAMP
+            cell = cAMP([x, y], self, self.j, 0)
+            # Add random amoutn of cAMP to cell (<1)
+            cell.add(random.random())
+            # Add new cell to cells list
+            self.cells.append(cell)
+            # Place cAMP onto grid at coordinates x, y
+            self.grid.place_agent(cell, tuple([x, y]))
+
+            # Loop to create SlimyAgents            
+            for i in range(self.n):
+                # Create object of type SlimyAgent
+                ag = SlimyAgent([x, y], self, self.j)
+                # Add new SlimyAgent object to agents list
+                self.agents.append(ag)
+                # Place agent onto grid at coordinates x, y
+                self.grid.place_agent(ag, tuple([x, y]))
+                # Add agent to schedule
+                self.schedule.add(ag)
+                # Increment j (unique_id variable)
+                self.j += 1
 
         # Create environment variable as array filled with zeros w x w
         self.env = np.zeros([self.w, self.w])
@@ -98,7 +96,7 @@ class SlimeModel(Model):
         lap = 0
         amt = 0
 
-        # Iterate thorugh every grid spot (cuasing inf loop?)
+        # Iterate thorugh every grid spot (causing inf loop?)
         for (contents, x, y) in self.grid.coord_iter():
             # Iterate through all contents of a grid cell
             for obj in contents:
@@ -114,6 +112,7 @@ class SlimeModel(Model):
                         else:
                             cNeighbors.append(neighbor)
                     # Loop through each cAMP neighbor
+                    lap = 0
                     for mol in cNeighbors:
                         # Get amount of cAMP
                         amt = mol.getAmt()
@@ -121,11 +120,12 @@ class SlimeModel(Model):
                         lap += amt
                     # Get center object's amount of cAMP
                     amt = obj.getAmt()
-                    # Calculate laplacian
+                    print("amt:", amt)
+                    # Calculate laplacian (curviture of the concentration
                     lap = (lap - 4 * amt)/(self.Dh**2)
-                    print(lap)
-                    exit()
-                    
+                    obj.add((-self.k * amt + self.Dc * lap) * self.Dt)
+                    print("decayed:", obj.getAmt())
+        exit()
 
         self.schedule.step()
 
