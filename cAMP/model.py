@@ -1,8 +1,9 @@
 from mesa import Model
 from mesa.time import RandomActivation
-from mesa.space import Grid
+from mesa.space import MultiGrid
+from mesa.datacollection import DataCollector
 
-from mesa.visualization.modules import CanvasGrid
+from mesa.visualization.modules import CanvasGrid, ChartModule
 from mesa.visualization.ModularVisualization import ModularServer
 from mesa.visualization.UserParam import UserSettableParameter
 
@@ -10,31 +11,29 @@ import random
 import math
 
 import numpy as np
-from agent import SlimeAgent
-
-''' This program runs but does not correctly display the model '''
+from agent import SlimeAgent, cAMP
 
 class SlimeModel(Model):
     def __init__(self, height, width):
         # number of agents per tile
-        self.n = 2
+        self.n = 1
         # rate of cAMP decay
-        self.k = .01
+        self.k = 1
         # diffusion constant of cAMP
-        self.Dc = .03
+        self.Dc = .001
         # spatial resolution for cAMP simulation
-        self.Dh = .03
+        self.Dh = .01
         # time resolution for cAMP simulation
-        self.Dt = .5
+        self.Dt = .01
         # rate of cAMP secretion by an agent
         self.f = 5
         # number of rows/columns in spatial array
         self.w = 2
 
         # height of grid
-        self.height = 200
+        self.height = 20
         # width of grid
-        self.width = 200
+        self.width = 20
 
         # counter for generating sequential unique id's
         self.j = 0
@@ -42,102 +41,139 @@ class SlimeModel(Model):
         # Create randomly ordered scheduler
         self.schedule = RandomActivation(self)
         # Create grid
-        self.grid = Grid(self.height, self.width, torus=False)
+        self.grid = MultiGrid(self.height, self.width, torus=False)
 
-#        self.datacollector = DataCollector({})
-        
-        # Initialize list of agents
+        # Going to add this functionality once the visualization gets going.
+        '''self.datacollector = DataCollector({
+            "Molds": lambda m: m.schedule.get_agent_count(SlimeAgent),
+            "cAMP's": lambda m: m.schedule.get_agent_count(cAMP),
+            })'''
+
+        # Initialize list of cells and slime agents
+        self.cells = list()
         self.agents = list()
 
         # Initial loop to create agents and fill agents list with them
         for (contents, x, y) in self.grid.coord_iter():
-            # Secondary loop
-            for i in range(1):
-                if(random.random() < .5):
+            # Create object of type cAMP
+            cell = cAMP([x, y], self, self.j, 0)
+            # Add random amoutn of cAMP to cell (<1)
+            cell.add(random.random())
+            # Add new cell to cells list
+            self.cells.append(cell)
+            # Place cAMP onto grid at coordinates x, y
+            self.grid._place_agent((x, y), cell)
+
+            # Loop to create SlimeAgents            
+            for i in range(self.n):
                 # Create object of type SlimeAgent
-                    ag = SlimeAgent(self.j, random.randint(0, self.w), random.randint(0, self.w))
+                ag = SlimeAgent([x, y], self, self.j)
                 # Add new SlimeAgent object to agents list
-                    self.agents.append(ag)
+                self.agents.append(ag)
                 # Place agent onto grid at coordinates x, y
-                    self.grid._place_agent((x, y), ag)
+                self.grid._place_agent((x, y), cell)
                 # Add agent to schedule
-                    self.schedule.add(ag)
+                self.schedule.add(ag)
                 # Increment j (unique_id variable)
-                    self.j += 1
+                self.j += 1
 
         # Create environment variable as array filled with zeros w x w
         self.env = np.zeros([self.w, self.w])
         # Create next environemnt variable as array filled with zeros and dimensions w x w
         self.nextenv = np.zeros([self.w, self.w])
         # Print out number of agents
-        print(self.j)
+        print("# of agents:", self.j)
 
         self.running = True
 
     # Step function
     def step(self):
-        ''' Create new references to w, k, Dc, Dt, and f to make equations more legible '''
-        w = self.w
-        k = self.k
-        Dc = self.Dc
-        Dt = self.Dt
-        f = self.f
+        cNeighbors = list()
+        neighbors = list()
+        lap = 0
+        amt = 0
+        cAMPobj = cAMP
+        newDiag = 0
+        oldDiag = 0
 
-        # Calculations for cAMP molecule agent movements
-        for x in range(self.w):
-            for y in range(self.w):
-                # Agent and its neighbors
-                C, R, L, U, D = self.env[x, y], self.env[(x+1)%w, y], self.env[(x - 1)%w, y], self.env[x, (y+1)%w], self.env[x, (y-1)%w]
-                # Curviture of the concentration
-                lap = (R + L + U + D - 4 * C)/(self.Dh**2)
+        ''' Perform cAMP decay and diffusion actions '''
+        for (contents, x, y) in self.grid.coord_iter():
+            # Iterate through all contents of a grid cell
+            for obj in contents:
+                # Set cAMP object to first value on cell (always of type cAMP)
+                cAMPobj = contents[0]
+                # Get all neighbors (excuding self)
+                neighbors = obj.getNeighbors()
+                # Wipe cNeighbors
+                cNeighbors = list()
+                # Examine each neighbor
+                for neighbor in neighbors:
+                    # Add cAMP neighbors to list
+                    if type(neighbor) is cAMP:
+                        cNeighbors.append(neighbor)
 
-                # Move environments along one
-                # -k * C = decay | Dc * lap = diffusion of cAMP | Dt = time
-                self.nextenv[x, y] = self.env[x, y] + (-k * C + Dc * lap) * Dt
-        
-        self.env, self.nextenv = self.nextenv, self.env
+                # Loop through each cAMP neighbor to calculate the laplace
+                lap = 0
+                for mol in cNeighbors:
+                    # Get amount of cAMP
+                    amt = mol.getAmt()
+                    # Add amount to variable lap
+                    lap += amt
 
-        # Loop to simulate secretions of cAMP by an agent
-        for ag in self.agents:
-            # Just secreting some cAMP
-            self.env[ag.x-1, ag.y-1] += f * Dt
+                if type(obj) is cAMP:
+                    # Get center object's amount of cAMP
+                    amt = obj.getAmt()
+                    # Calculate laplacian (curviture of the concentration)
+                    lap = (lap - 4 * amt)/(self.Dh**2)
+                    # Add decay to amount of cAMP for the agent
+                    obj.add((-self.k * amt + self.Dc * lap) * self.Dt)
+                
+                # Loop through each mold agent and move it
+                for agent in contents[1::]:
+                    # Add cAMP secretion to the cell that the agent shares with a cAMP object (a little confusing on the names, oops!)
+                    cAMPobj.add(self.f * self.Dt)
+                    # Decide whether or not to move
+                    newx = (x + random.randint(-1, 2)) % self.w
+                    newy = (y + random.randint(-1, 2)) % self.w
 
-            # Agent deciding to move
-            newx, newy = (ag.x + random.randint(-1, 2)) % w, (ag.y + random.randint(-1, 2)) % w
-            diff = (self.env[newx-1, newy-1] - self.env[ag.x-1, ag.y-1]) / 0.1
+                    # Calculate differences
+                    newDiag = ((self.grid[newx-1][newy-1])[0]).getAmt()
+                    diff = ((self.grid[x-1][y-1])[0]).getAmt()
+                    
+                    # Fix if there are crazy values for diff
+                    if diff > 10:
+                        diff = 10
+                    elif diff < 10:
+                        diff = -10
 
-            # Redundancy for insane values of diff
-            if diff > 10:
-                diff = 10
-            elif diff < -10:
-                diff = -10
-            if random.random() < np.exp(diff) / (1 + np.exp(diff)):
-                ag.x, ag.y = newx, newy
+                    # Decide to move
+                    if random.random() < np.exp(diff) / (1 + np.exp(diff)):                    
+                        agent.move(tuple([newx, newy]))
 
-            # Increment number of agents (for testing purposes)
-            self.j += 1
-#            self.grid._place_agent((x, y), ag)
-
-        # Print out new number of agents (testing)
-        print(self.j)
-        # Add step to schedule
         self.schedule.step()
+#        self.datacollector.collect(self)
+
+''' Server elements '''
 
 # Function for defining portayal
-def cAMP_portrayal(molecule):
-    # Dictionary for setting portrayal settings of agents
-    portrayal = {"Shape": "rect", "w": 1, "h": 1, "Filled": "true", "Layer": 0}
-    # Setting x coordinate of agent in portrayal dict
-    portrayal["x"] = SlimeAgent.getX
-    # Setting y coordinate of agent in portrayal dict
-    portrayal["y"] = SlimeAgent.getY
-    # Setting agent color to hex 43566c (a lightish navy)
-    portrayal["color"] = "43566c"
+def cAMP_portrayal(agent):
+    portrayal = dict()
+    if type(agent) is SlimeAgent:
+        # Dictionary for setting portrayal settings of agents
+        portrayal = {"Shape": "rect", "w": 1, "h": 1, "Filled": "true", "Layer": 0}
+        # Setting x coordinate of agent in portrayal dict
+        portrayal["x"] = mold.getX
+        # Setting y coordinate of agent in portrayal dict
+        portrayal["y"] = mold.getY
+        # Setting agent color to blue
+        portrayal["color"] = "blue"
 
     return portrayal
 
 # Telling mesa to create a grid with the agent
-canvas_element = CanvasGrid(cAMP_portrayal, 200, 200, 600, 600)
+canvas_element = CanvasGrid(cAMP_portrayal, 50, 50, 500, 500)
+
+#chart_element = ChartModule([{"Label": "Molds", "Color":"#43566c"}, {"Label":"cAMP's", "Color":"#acdabd"}])
 
 # Setting size of model
 model_params = {"height": 200, "width": 200}
