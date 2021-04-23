@@ -8,6 +8,12 @@ class cAMP(Agent):
         self.pos = pos
         self.amount = amount
 
+    def getX(self):
+        return self.pos[0]
+
+    def getY(self):
+        return self.pos[1]
+
     # Get current amount of cAMP
     def getAmt(self):
         return self.amount
@@ -60,5 +66,4 @@ class SlimeAgent(Agent):
         self.model.grid.move_agent(self, newPos)
 
     def step(self):
-#        print("Hi! My name is", self.unique_id, "and my coordinates are x:", self.pos[0], "y:", self.pos[1])
         pass
