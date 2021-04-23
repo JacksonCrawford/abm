@@ -14,7 +14,7 @@ import numpy as np
 from agent import SlimeAgent, cAMP
 
 class SlimeModel(Model):
-    def __init__(self, height, width):
+    def __init__(self, height, width, numAgents, kRate, dcDiffu, dhRes, dtRes, secRate, numCol):
         # number of agents per tile
         self.n = 2
         # rate of cAMP decay
@@ -70,9 +70,7 @@ class SlimeModel(Model):
                 ag = SlimeAgent([x, y], self, self.j)
                 # Add new SlimeAgent object to agents list
                 self.agents.append(ag)
-#                print(ag.getX(), ":", ag.getY())
                 # Place agent onto grid at coordinates x, y
-#                self.grid._place_agent((x, y), cell)
                 self.grid.place_agent(ag, tuple([x, y]))
                 # Add agent to schedule
                 self.schedule.add(ag)
@@ -101,7 +99,6 @@ class SlimeModel(Model):
         ''' Perform cAMP decay and diffusion actions '''
         for (contents, x, y) in self.grid.coord_iter():
             # Iterate through all contents of a grid cell
-#            print(contents)
             for obj in contents:
                 # Set cAMP object to first value on cell (always of type cAMP)
                 cAMPobj = contents[0]
@@ -131,8 +128,6 @@ class SlimeModel(Model):
                     # Add decay to amount of cAMP for the agent
                     obj.add((-self.k * amt + self.Dc * lap) * self.Dt)
                 
-#                print(contents)
-
                 # Loop through each mold agent and move it
                 for agent in contents[1::]:
                     # Add cAMP secretion to the cell that the agent shares with a cAMP object (a little confusing on the names, oops!)
@@ -163,18 +158,45 @@ class SlimeModel(Model):
 # Function for defining portayal
 def cAMP_portrayal(agent):
     portrayal = dict()
+    amt = 0
     if type(agent) is SlimeAgent:
-        # Dictionary for setting portrayal settings of agents
+        # Dictionary for setting portrayal settings of SlimeAgent agent
         portrayal = {"Shape": "rect", "w": 1, "h": 1, "Filled": "true", "Layer": 0}
         # Setting x coordinate of agent in portrayal dict
         portrayal["x"] = agent.getX()
         # Setting y coordinate of agent in portrayal dict
         portrayal["y"] = agent.getY()
-        # Setting agent color to blue
-        portrayal["Color"] = "blue"
-    '''elif type(agent) is cAMP:
+        # Setting agent color to blue 
+        portrayal["Color"] = "#357ecb"
+    elif type(agent) is cAMP:
+        # Dictionary for setting portrayal settings of cAMP agent
         portrayal = {"Shape": "rect", "w": 1, "h": 1, "Filled": "true", "Layer": 0}
-        portrayal["x"] = agent.getX'''
+        # Setting x coordinate of agent in portrayal dict
+        portrayal["x"] = agent.getX()
+        # Setting y coordinate of agent in portrayal dict
+        portrayal["y"] = agent.getY()
+        # Setting amount of cAMP to amt
+        amt = agent.getAmt()
+
+        # Change color to darker shade of gray with increased cAMP amount
+        if amt == 0:
+            portrayal["Color"] = "white"
+        elif amt < 3:
+            portrayal["Color"] = "#d4d4d4"
+        elif amt < 6:
+            portrayal["Color"] = "#a2a2a2"
+        elif amt < 9:
+            portrayal["Color"] = "#6e6e6e"
+        elif amt < 12:
+            portrayal["Color"] = "#5e5e5e"
+        elif amt < 15:
+            portrayal["Color"] = "#4e4e4e"
+        elif amt < 18:
+            portrayal["Color"] = "#3b3b3b"
+        elif amt < 21:
+            portrayal["Color"] = "#2a2a2a"
+        else:
+            portrayal["Color"] = "#828282"
 
     return portrayal
 
@@ -184,9 +206,19 @@ canvas_element = CanvasGrid(cAMP_portrayal, 50, 50, 600, 600)
 #chart_element = ChartModule([{"Label": "Molds", "Color":"#43566c"}, {"Label":"cAMP's", "Color":"#acdabd"}])
 
 # Setting size of model
-model_params = {"height": 200, "width": 200}
+model_params = {
+        "height": 200,
+        "width": 200,
+        "numAgents": UserSettableParameter("slider", "Number of Agents", 1, 1, 10, 1),
+        "kRate": UserSettableParameter("slider", "Rate of cAMP decay", 0.5, .1, 10, .5),
+        "dcDiffu": UserSettableParameter("slider", "Diffusion Constant of cAMP", .001, .0001, .05, .005),
+        "dhRes": UserSettableParameter("slider", "Spatial Resolution for cAMP Simulation", .01, .01, 1, .01),
+        "dtRes": UserSettableParameter("slider", "Time Resolution for cAMP Simulation", .01, .001, 1, .01),
+        "secRate": UserSettableParameter("slider", "Rate of cAMP Secretion by an Agent", 5, 1, 15, 1),
+        "numCol": UserSettableParameter("slider", "Number of Rows/Columns in Spatial Array", 20, 2, 100, 2)
+        }
 
 # Creating ModularServer
-server = ModularServer(SlimeModel, [canvas_element], "cAMP Aggregation Model", model_params)
+server = ModularServer(SlimeModel, [canvas_element], "Keller-Segel Slime Mold Aggregation Model", model_params)
 # Launching Server
 server.launch()
