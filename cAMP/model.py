@@ -16,7 +16,7 @@ from agent import SlimeAgent, cAMP
 class SlimeModel(Model):
     def __init__(self, height, width):
         # number of agents per tile
-        self.n = 1
+        self.n = 2
         # rate of cAMP decay
         self.k = 1
         # diffusion constant of cAMP
@@ -31,9 +31,9 @@ class SlimeModel(Model):
         self.w = 20
 
         # height of grid
-        self.height = 20
+        self.height = 50
         # width of grid
-        self.width = 20
+        self.width = 50
 
         # counter for generating sequential unique id's
         self.j = 0
@@ -70,9 +70,10 @@ class SlimeModel(Model):
                 ag = SlimeAgent([x, y], self, self.j)
                 # Add new SlimeAgent object to agents list
                 self.agents.append(ag)
-                print(ag.getX(), ":", ag.getY())
+#                print(ag.getX(), ":", ag.getY())
                 # Place agent onto grid at coordinates x, y
-                self.grid._place_agent((x, y), cell)
+#                self.grid._place_agent((x, y), cell)
+                self.grid.place_agent(ag, tuple([x, y]))
                 # Add agent to schedule
                 self.schedule.add(ag)
                 # Increment j (unique_id variable)
@@ -100,6 +101,7 @@ class SlimeModel(Model):
         ''' Perform cAMP decay and diffusion actions '''
         for (contents, x, y) in self.grid.coord_iter():
             # Iterate through all contents of a grid cell
+#            print(contents)
             for obj in contents:
                 # Set cAMP object to first value on cell (always of type cAMP)
                 cAMPobj = contents[0]
@@ -129,9 +131,10 @@ class SlimeModel(Model):
                     # Add decay to amount of cAMP for the agent
                     obj.add((-self.k * amt + self.Dc * lap) * self.Dt)
                 
+#                print(contents)
+
                 # Loop through each mold agent and move it
                 for agent in contents[1::]:
-                    print(agents.getX())
                     # Add cAMP secretion to the cell that the agent shares with a cAMP object (a little confusing on the names, oops!)
                     cAMPobj.add(self.f * self.Dt)
                     # Decide whether or not to move
@@ -161,7 +164,6 @@ class SlimeModel(Model):
 def cAMP_portrayal(agent):
     portrayal = dict()
     if type(agent) is SlimeAgent:
-        print("banana")
         # Dictionary for setting portrayal settings of agents
         portrayal = {"Shape": "rect", "w": 1, "h": 1, "Filled": "true", "Layer": 0}
         # Setting x coordinate of agent in portrayal dict
@@ -177,7 +179,7 @@ def cAMP_portrayal(agent):
     return portrayal
 
 # Telling mesa to create a grid with the agent
-canvas_element = CanvasGrid(cAMP_portrayal, 20, 20, 400, 400)
+canvas_element = CanvasGrid(cAMP_portrayal, 50, 50, 600, 600)
 
 #chart_element = ChartModule([{"Label": "Molds", "Color":"#43566c"}, {"Label":"cAMP's", "Color":"#acdabd"}])
 
