@@ -58,3 +58,7 @@ class SlimeAgent(Agent):
     # Move to a specified position
     def move(self, newPos):
         self.model.grid.move_agent(self, newPos)
+
+    def step(self):
+#        print("Hi! My name is", self.unique_id, "and my coordinates are x:", self.pos[0], "y:", self.pos[1])
+        pass

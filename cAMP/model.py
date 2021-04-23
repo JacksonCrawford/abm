@@ -28,7 +28,7 @@ class SlimeModel(Model):
         # rate of cAMP secretion by an agent
         self.f = 5
         # number of rows/columns in spatial array
-        self.w = 2
+        self.w = 20
 
         # height of grid
         self.height = 20
@@ -70,6 +70,7 @@ class SlimeModel(Model):
                 ag = SlimeAgent([x, y], self, self.j)
                 # Add new SlimeAgent object to agents list
                 self.agents.append(ag)
+                print(ag.getX(), ":", ag.getY())
                 # Place agent onto grid at coordinates x, y
                 self.grid._place_agent((x, y), cell)
                 # Add agent to schedule
@@ -130,6 +131,7 @@ class SlimeModel(Model):
                 
                 # Loop through each mold agent and move it
                 for agent in contents[1::]:
+                    print(agents.getX())
                     # Add cAMP secretion to the cell that the agent shares with a cAMP object (a little confusing on the names, oops!)
                     cAMPobj.add(self.f * self.Dt)
                     # Decide whether or not to move
@@ -159,19 +161,23 @@ class SlimeModel(Model):
 def cAMP_portrayal(agent):
     portrayal = dict()
     if type(agent) is SlimeAgent:
+        print("banana")
         # Dictionary for setting portrayal settings of agents
         portrayal = {"Shape": "rect", "w": 1, "h": 1, "Filled": "true", "Layer": 0}
         # Setting x coordinate of agent in portrayal dict
-        portrayal["x"] = mold.getX
+        portrayal["x"] = agent.getX()
         # Setting y coordinate of agent in portrayal dict
-        portrayal["y"] = mold.getY
+        portrayal["y"] = agent.getY()
         # Setting agent color to blue
-        portrayal["color"] = "blue"
+        portrayal["Color"] = "blue"
+    '''elif type(agent) is cAMP:
+        portrayal = {"Shape": "rect", "w": 1, "h": 1, "Filled": "true", "Layer": 0}
+        portrayal["x"] = agent.getX'''
 
     return portrayal
 
 # Telling mesa to create a grid with the agent
-canvas_element = CanvasGrid(cAMP_portrayal, 50, 50, 500, 500)
+canvas_element = CanvasGrid(cAMP_portrayal, 20, 20, 400, 400)
 
 #chart_element = ChartModule([{"Label": "Molds", "Color":"#43566c"}, {"Label":"cAMP's", "Color":"#acdabd"}])
 
