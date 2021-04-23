@@ -11,7 +11,7 @@ import random
 import math
 
 import numpy as np
-from agent import SlimeAgent, cAMP
+from agents import SlimeAgent, cAMP
 
 class SlimeModel(Model):
     def __init__(self, height, width, numAgents, kRate, dcDiffu, dhRes, dtRes, secRate, numCol):
