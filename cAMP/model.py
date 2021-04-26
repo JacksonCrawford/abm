@@ -13,8 +13,16 @@ import math
 import numpy as np
 from agents import SlimeAgent, cAMP
 
+'''
+    Change only the value of masterHeight to change the dimensions of the grid
+        because it must always be a square.
+'''
+
+masterHeight = 50
+masterWidth = masterHeight
+
 class SlimeModel(Model):
-    def __init__(self, height, width, numAgents, gDense, kRate, dcDiffu, dhRes, dtRes, secRate):
+    def __init__(self, height, width, color, numAgents, gDense, kRate, dcDiffu, dhRes, dtRes, secRate):
         # number of agents per tile
         self.n = numAgents
         # grid density
@@ -30,31 +38,29 @@ class SlimeModel(Model):
         # rate of cAMP secretion by an agent
         self.f = secRate
         # number of rows/columns in spatial array
-        self.w = 50
+        self.w = masterHeight
+        # agent color
+        self.color = color
 
         # height of grid
-        self.height = 50
+        self.height = masterHeight
         # width of grid
-        self.width = 50
+        self.width = masterWidth
 
         # counter for generating sequential unique id's
         self.j = 0
 
         # Create randomly ordered scheduler
         self.schedule = SimultaneousActivation(self)
-        # Create grid
+        # Create grid (of type MultiGrid to support multiple agents per cell
         self.grid = MultiGrid(self.height, self.width, torus=False)
 
-        # Going to add this functionality once the visualization gets going.
-        '''self.datacollector = DataCollector({
-            "Molds": lambda m: m.schedule.get_agent_count(SlimeAgent),
-            "cAMP's": lambda m: m.schedule.get_agent_count(cAMP),
-            })'''
-
-        # Initialize list of cells and slime agents
-        self.cells = list()
-        self.agents = list()
-    
+        # Create datacollector to retrieve total amount of cAMP on the grid
+        self.datacollector = DataCollector({
+            "Total Amout of cAMP": agent.getAmt() for agent in self.schedule.agents
+        })
+        
+        # Variable for storing random numbers
         r = 0
     
         # Initial loop to create agents and fill agents list with them
@@ -63,8 +69,6 @@ class SlimeModel(Model):
             cell = cAMP([x, y], self, self.j, 0)
             # Add random amoutn of cAMP to cell (<1)
             cell.add(random.random())
-            # Add new cell to cells list
-            self.cells.append(cell)
             # Place cAMP onto grid at coordinates x, y
             self.grid._place_agent((x, y), cell)
 
@@ -73,17 +77,18 @@ class SlimeModel(Model):
                 r = random.random()
                 if r <= self.gD:
                     for i in range(self.n):
-                        ag = SlimeAgent([x, y], self, self.j)
-                        self.agents.append(ag)
+                        # Create object of type SlimeAgent
+                        ag = SlimeAgent([x, y], self, self.j, self.color)
+                        # Place agent onto grid at coordinates x, y
                         self.grid.place_agent(ag, tuple([x, y]))
+                        # Add agent to schedule
                         self.schedule.add(ag)
+                        # Increment j (unique_id variable)
                         self.j += 1
             else:
                 for i in range(self.n):
                     # Create object of type SlimeAgent
-                    ag = SlimeAgent([x, y], self, self.j)
-                    # Add new SlimeAgent object to agents list
-                    self.agents.append(ag)
+                    ag = SlimeAgent([x, y], self, self.j, self.color)
                     # Place agent onto grid at coordinates x, y
                     self.grid.place_agent(ag, tuple([x, y]))
                     # Add agent to schedule
@@ -109,6 +114,8 @@ class SlimeModel(Model):
         cAMPobj = cAMP
         newDiag = 0
         oldDiag = 0
+        nAgents = 0
+        layer = 1
 
         ''' Perform cAMP decay and diffusion actions '''
         for (contents, x, y) in self.grid.coord_iter():
@@ -141,9 +148,12 @@ class SlimeModel(Model):
                     lap = (lap - 4 * amt)/(self.Dh**2)
                     # Add decay to amount of cAMP for the agent
                     obj.add((-self.k * amt + self.Dc * lap) * self.Dt)
-                
+
                 # Loop through each mold agent and move it
+                nAgents = len(contents) - 1
                 for agent in contents[1::]:
+                    agent.addLayer()
+                    layer = agent.getLayer()
                     # Add cAMP secretion to the cell that the agent shares with a cAMP object (a little confusing on the names, oops!)
                     cAMPobj.add(self.f * self.Dt)
                     # Decide whether or not to move
@@ -164,8 +174,35 @@ class SlimeModel(Model):
                     if random.random() < np.exp(diff) / (1 + np.exp(diff)):                    
                         agent.move(tuple([newx, newy]))
 
+                    # Only change color of agent that is on top of a stack
+                    if layer >= nAgents:
+                        self.pickColor(agent, nAgents)
+
+        # Add step to schedule
         self.schedule.step()
-#        self.datacollector.collect(self)
+        # Collect new data
+        self.datacollector.collect(self)
+
+
+    def pickColor(self, topAgent, nAgents):
+        shade = topAgent.getShades()
+        if nAgents <= 2:
+            topAgent.setShade(shade[0])
+        elif nAgents == 3:
+            topAgent.setShade(shade[1])
+        elif nAgents == 4:
+            topAgent.setShade(shade[2])
+        elif nAgents == 5:
+            topAgent.setShade(shade[3])
+        elif nAgents == 6:
+            topAgent.setShade(shade[4])
+        elif nAgents == 7:
+            topAgent.setShade(shade[5])
+        elif nAgents == 8:
+            topAgent.setShade(shade[6])
+        elif nAgents == 9:
+            topAgent.setShade(shade[7])
+
 
 ''' Server elements '''
 
@@ -181,8 +218,7 @@ def cAMP_portrayal(agent):
         # Setting y coordinate of agent in portrayal dict
         portrayal["y"] = agent.getY()
         # Setting agent color to red 
-#        portrayal["Color"] = "#357ecb"
-        portrayal["Color"] = "red"
+        portrayal["Color"] = agent.getShade()
     elif type(agent) is cAMP:
         # Dictionary for setting portrayal settings of cAMP agent
         portrayal = {"Shape": "rect", "w": 1, "h": 1, "Filled": "true", "Layer": 0}
@@ -215,9 +251,8 @@ def cAMP_portrayal(agent):
 
     return portrayal
 
-# Telling mesa to create a grid with the agent
-
-#chart_element = ChartModule([{"Label": "Molds", "Color":"#43566c"}, {"Label":"cAMP's", "Color":"#acdabd"}])
+# Create a chart to represent total amount of cAMP on the grid
+chart_element = ChartModule([{"Label":"Total Amount of cAMP", "Color":"#85c6e7"}])
 
 # Setting size of model
 model_params = {
@@ -225,17 +260,19 @@ model_params = {
         "width": 200,
         "numAgents": UserSettableParameter("slider", "Number of Agents", 1, 1, 10, 1),
         "gDense": UserSettableParameter("slider", "Density of Agents on Grid", .5, 0, 1, .1),
-        "kRate": UserSettableParameter("slider", "Rate of cAMP decay", 0.5, 0, 1, .1),
+        "kRate": UserSettableParameter("slider", "Rate of cAMP decay", 1, 0, 5, .5),
         "dcDiffu": UserSettableParameter("slider", "Diffusion Constant of cAMP", .001, 0, .01, .001),
         "dhRes": UserSettableParameter("slider", "Spatial Resolution for cAMP Simulation", .01, 0, .1, .01),
         "dtRes": UserSettableParameter("slider", "Time Resolution for cAMP Simulation", .01, .01, .1, .01),
-        "secRate": UserSettableParameter("slider", "Rate of cAMP Secretion by an Agent", 5, 1, 15, 1)
+        "secRate": UserSettableParameter("slider", "Rate of cAMP Secretion by an Agent", 1, 0, 15, 1),
+        "color": UserSettableParameter("choice", "Agent Color", value="Blue", choices=["Blue", "Red", "Green"])
         }
 
-canvas_element = CanvasGrid(cAMP_portrayal, 50, 50, 550, 550)
+# Create grid for agents of size 550px x 550px, with 50 tiles along x and 50 along y
+canvas_element = CanvasGrid(cAMP_portrayal, masterHeight, masterWidth, 550, 550)
 
 
 # Creating ModularServer
-server = ModularServer(SlimeModel, [canvas_element], "Keller-Segel Slime Mold Aggregation Model", model_params)
+server = ModularServer(SlimeModel, [canvas_element, chart_element], "Keller-Segel Slime Mold Aggregation Model", model_params)
 # Launching Server
 server.launch()
