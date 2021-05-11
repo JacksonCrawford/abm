@@ -55,9 +55,12 @@ class SlimeModel(Model):
         # Create grid (of type MultiGrid to support multiple agents per cell
         self.grid = MultiGrid(self.height, self.width, torus=False)
 
+        # Initialize list of cAMP molecules
+        self.cAMPs = list()
+
         # Create datacollector to retrieve total amount of cAMP on the grid
         self.datacollector = DataCollector({
-            "Total Amout of cAMP": agent.getAmt() for agent in self.schedule.agents
+            "Total Amount of cAMP": self.getAmts
         })
         
         # Variable for storing random numbers
@@ -71,6 +74,8 @@ class SlimeModel(Model):
             cell.add(random.random())
             # Place cAMP onto grid at coordinates x, y
             self.grid._place_agent((x, y), cell)
+            # Add cAMP molecule to list
+            self.cAMPs.append(cell)
 
             # Loop to create SlimeAgents
             if self.gD % 1 != 0:
@@ -105,7 +110,17 @@ class SlimeModel(Model):
 
         self.running = True
 
-    # Step function
+    # Method for getting total cAMP amount
+    def getAmts(self):
+        # Initialize empty total variable
+        total = 0
+        # Loop to get total amount of cAMP from cAMPs list
+        for molecule in self.cAMPs:
+            total += molecule.getAmt()
+
+        return total
+
+    # Step method
     def step(self):
         cNeighbors = list()
         neighbors = list()
