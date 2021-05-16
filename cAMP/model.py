@@ -125,7 +125,7 @@ class SlimeModel(Model):
         cNeighbors = list()
         neighbors = list()
         lap = 0
-        amt = 0
+        amtSelf = 0
         cAMPobj = cAMP
         newDiag = 0
         oldDiag = 0
@@ -134,64 +134,72 @@ class SlimeModel(Model):
 
         ''' Perform cAMP decay and diffusion actions '''
         for (contents, x, y) in self.grid.coord_iter():
+            # Initialize number of agents for layer coloring
+            nAgents = len(contents) - 1
+            # Reset lap to 0
+            lap = 0 
+
+            # Set cAMPobj to current tile's cAMP agent
+            cAMPobj = contents[0]
+            # Set neighbors to cAMPobj's neighbors (Von Neumann)
+            neighbors = cAMPobj.getNeighbors()
+            # Add cAMP objects form neighbors to cNeighbors
+            for neighbor in neighbors:
+                if type(neighbor) is cAMP:
+                    cNeighbors.append(neighbor)
+
+            # Add sum of neighbors to lap
+            for mol in cNeighbors:
+                lap += mol.getAmt()
+
+            amtSelf = cAMPobj.getAmt()
+            # Reassign lap to the laplacian (using previous neighbor sum value)
+            lap = (lap - 4 * amtSelf)/(self.Dh**2)
+            # Add decay to current cAMP object
+            cAMPobj.add((-self.k * amtSelf + self.Dc * lap) * self.Dt)
+
+            # Wipe cNeighbors
+            cNeighbors.clear()
+
             # Iterate through all contents of a grid cell
-            for obj in contents:
-                # Set cAMP object to first value on cell (always of type cAMP)
-                cAMPobj = contents[0]
+            for agent in contents[1::]:
                 # Get all neighbors (excuding self)
-                neighbors = obj.getNeighbors()
-                # Wipe cNeighbors
-                cNeighbors.clear()
+                neighbors = agent.getNeighbors()
                 # Examine each neighbor
                 for neighbor in neighbors:
                     # Add cAMP neighbors to list
                     if type(neighbor) is cAMP:
                         cNeighbors.append(neighbor)
 
-                # Loop through each cAMP neighbor to calculate the laplace
-                lap = 0
-                for mol in cNeighbors:
-                    # Get amount of cAMP
-                    amt = mol.getAmt()
-                    # Add amount to variable lap
-                    lap += amt
+                # Add cAMP secretion to the cell that the agent shares with a cAMP object
+                cAMPobj.add(self.f * self.Dt)
+                # Decide whether or not to move
+                newx = (x + random.randint(-1, 2)) % self.w
+                newy = (y + random.randint(-1, 2)) % self.w
 
-                if type(obj) is cAMP:
-                    # Get center object's amount of cAMP
-                    amt = obj.getAmt()
-                    # Calculate laplacian (curviture of the concentration)
-                    lap = (lap - 4 * amt)/(self.Dh**2)
-                    # Add decay to amount of cAMP for the agent
-                    obj.add((-self.k * amt + self.Dc * lap) * self.Dt)
+                # Calculate differences
+                newDiag = ((self.grid[newx-1][newy-1])[0]).getAmt()
+                diff = ((self.grid[x-1][y-1])[0]).getAmt()
+                
+                # Fix if there are crazy values for diff
+                if diff > 10:
+                    diff = 10
+                elif diff < 10:
+                    diff = -10
 
-                # Loop through each mold agent and move it
-                nAgents = len(contents) - 1
-                for agent in contents[1::]:
-                    agent.addLayer()
-                    layer = agent.getLayer()
-                    # Add cAMP secretion to the cell that the agent shares with a cAMP object (a little confusing on the names, oops!)
-                    cAMPobj.add(self.f * self.Dt)
-                    # Decide whether or not to move
-                    newx = (x + random.randint(-1, 2)) % self.w
-                    newy = (y + random.randint(-1, 2)) % self.w
+                # Decide to move
+                if random.random() < np.exp(diff) / (1 + np.exp(diff)):                    
+                    agent.move(tuple([newx, newy]))
+                
+                # Layers for coloring agents based on density
+                agent.addLayer()
+                layer = agent.getLayer()
+                # Only change color of agent that is on top of a stack
+                if layer >= nAgents:
+                    self.pickColor(agent, nAgents)
 
-                    # Calculate differences
-                    newDiag = ((self.grid[newx-1][newy-1])[0]).getAmt()
-                    diff = ((self.grid[x-1][y-1])[0]).getAmt()
-                    
-                    # Fix if there are crazy values for diff
-                    if diff > 10:
-                        diff = 10
-                    elif diff < 10:
-                        diff = -10
-
-                    # Decide to move
-                    if random.random() < np.exp(diff) / (1 + np.exp(diff)):                    
-                        agent.move(tuple([newx, newy]))
-
-                    # Only change color of agent that is on top of a stack
-                    if layer >= nAgents:
-                        self.pickColor(agent, nAgents)
+                # Wipe cNeighbors
+                cNeighbors.clear()
 
         # Add step to schedule
         self.schedule.step()
