@@ -22,7 +22,10 @@ class cAMP(Agent):
 
     # Add some amount of cAMP
     def add(self, amt):
-        self.amount += amt
+        if (self.amount + amt) > 0:
+            self.amount += amt
+        else:
+            self.amount = 0
 
     # Get immediate neighbors without center or diagonals
     def getNeighbors(self):
@@ -42,7 +45,7 @@ class SlimeAgent(Agent):
             self.shade = "#00741c"
         else:
             self.shade = "#4a7d8e"
-        
+
         self.layer = 1
 
     # Get agent's Unique ID
