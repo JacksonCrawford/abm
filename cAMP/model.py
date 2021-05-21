@@ -255,22 +255,50 @@ def cAMP_portrayal(agent):
         # Change color to darker shade of gray with increased cAMP amount
         if amt == 0:
             portrayal["Color"] = "white"
+        elif amt < 1:
+            portrayal["Color"] = "#f5f5f5"
+        elif amt < 2:
+            portrayal["Color"] = "#e9e9e9"
         elif amt < 3:
-            portrayal["Color"] = "#c3c3c3"
+            portrayal["Color"] = "#d9d9d9"
+        elif amt < 4:
+            portrayal["Color"] = "#cccccc"
+        elif amt < 5:
+            portrayal["Color"] = "#c1c1c1"
         elif amt < 6:
-            portrayal["Color"] = "#b1b1b1"
+            portrayal["Color"] = "#b4b4b4"
+        elif amt < 7:
+            portrayal["Color"] = "#a3a3a3"
+        elif amt < 8:
+            portrayal["Color"] = "#949494"
         elif amt < 9:
-            portrayal["Color"] = "#a1a1a1"
+            portrayal["Color"] = "#8a8a8a"
+        elif amt < 10:
+            portrayal["Color"] = "#787878"
+        elif amt < 11:
+            portrayal["Color"] = "#696969"
         elif amt < 12:
-            portrayal["Color"] = "#929292"
+            portrayal["Color"] = "#5b5b5b"
+        elif amt < 13:
+            portrayal["Color"] = "#505050"
+        elif amt < 14:
+            portrayal["Color"] = "#464646"
         elif amt < 15:
-            portrayal["Color"] = "#868686"
+            portrayal["Color"] = "#3c3c3c"
+        elif amt < 16:
+            portrayal["Color"] = "#313131"
+        elif amt < 17:
+            portrayal["Color"] = "#282828"
         elif amt < 18:
-            portrayal["Color"] = "#7b7b7b"
+            portrayal["Color"] = "#1d1d1d"
+        elif amt < 19:
+            portrayal["Color"] = "#1515150"
+        elif amt < 20:
+            portrayal["Color"] = "#0c0c0c"
         elif amt < 21:
-            portrayal["Color"] = "#6e6e6e"
+            portrayal["Color"] = "#090909"
         else:
-            portrayal["Color"] = "#646464"
+            portrayal["Color"] = "#000000"
 
     return portrayal
 
