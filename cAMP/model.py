@@ -63,6 +63,9 @@ class SlimeModel(Model):
             "Total Amount of cAMP": self.getAmts
         })
         
+        '''"Column Totals for cAMP": self.getColAmts(x) for (contents, x, y) in self.grid.coord_iter(),
+            "Row Totals for cAMP": self.getRowAmts(y) for (contents, x, y) in self.grid.coord_iter()'''
+
         # Variable for storing random numbers
         r = 0
     
@@ -120,6 +123,20 @@ class SlimeModel(Model):
 
         return total
 
+    def getRowAmts(self, y):
+        total = 0
+        for x in range(masterWidth):
+            total += self.grid.get_cell_list_contents((x, y))[0].getAmt()
+
+        return total
+
+    def getColAmts(self, x):
+        total = 0
+        for y in range(masterHeight):
+            total += self.grid.get_cell_list_contents((x, y))[0].getAmt()
+
+        return total
+
     # Step method
     def step(self):
         cNeighbors = list()
@@ -131,6 +148,11 @@ class SlimeModel(Model):
         oldDiag = 0
         nAgents = 0
         layer = 1
+
+        '''for (contents, x, y) in self.grid.coord_iter():
+            print("col " + str(x) + ":  " + str(self.getColAmts(x)))
+            print("row " + str(y) + ":  " + str(self.getRowAmts(y)))'''
+
 
         ''' Perform cAMP decay and diffusion actions '''
         for (contents, x, y) in self.grid.coord_iter():
