@@ -1,9 +1,9 @@
 from mesa import Model
-from mesa.time import RandomActivation, SimultaneousActivation
+from mesa.time import SimultaneousActivation
 from mesa.space import MultiGrid
 from mesa.datacollection import DataCollector
 
-from mesa.visualization.modules import CanvasGrid, ChartModule
+from mesa.visualization.modules import CanvasGrid, ChartModule, BarChartModule
 from mesa.visualization.ModularVisualization import ModularServer
 from mesa.visualization.UserParam import UserSettableParameter
 
@@ -58,17 +58,22 @@ class SlimeModel(Model):
         # Initialize list of cAMP molecules
         self.cAMPs = list()
 
+        dc = {"Total Amount of cAMP": self.getAmts}
+
+        coord = 0
+
+        for x in range(masterWidth):
+            dc.update({str(coord): self.getColAmts})
+            coord += 1
+
+        print(dc)
+
         # Create datacollector to retrieve total amount of cAMP on the grid
-        self.datacollector = DataCollector({
-            "Total Amount of cAMP": self.getAmts
-        })
-        
-        '''"Column Totals for cAMP": self.getColAmts(x) for (contents, x, y) in self.grid.coord_iter(),
-            "Row Totals for cAMP": self.getRowAmts(y) for (contents, x, y) in self.grid.coord_iter()'''
+        self.datacollector = DataCollector(dc)
 
         # Variable for storing random numbers
         r = 0
-    
+
         # Initial loop to create agents and fill agents list with them
         for (contents, x, y) in self.grid.coord_iter():
             # Create object of type cAMP
@@ -123,17 +128,27 @@ class SlimeModel(Model):
 
         return total
 
-    def getRowAmts(self, y):
+    def getRowAmts(self):
         total = 0
+        y = 0
         for x in range(masterWidth):
-            total += self.grid.get_cell_list_contents((x, y))[0].getAmt()
+            try:
+                total += self.grid.get_cell_list_contents((x, y))[0].getAmt()
+            except IndexError:
+                print(str(y) + ", " + str(y))
+            y += 1
 
         return total
 
-    def getColAmts(self, x):
+    def getColAmts(self):
         total = 0
-        for y in range(masterHeight):
-            total += self.grid.get_cell_list_contents((x, y))[0].getAmt()
+        x = 0
+        for y in range(masterWidth):
+            try:
+                total += self.grid.get_cell_list_contents((x, y))[0].getAmt()
+            except IndexError:
+                print(str(x) + ", " + str(y))
+            x += 1
 
         return total
 
@@ -148,11 +163,6 @@ class SlimeModel(Model):
         oldDiag = 0
         nAgents = 0
         layer = 1
-
-        '''for (contents, x, y) in self.grid.coord_iter():
-            print("col " + str(x) + ":  " + str(self.getColAmts(x)))
-            print("row " + str(y) + ":  " + str(self.getRowAmts(y)))'''
-
 
         ''' Perform cAMP decay and diffusion actions '''
         for (contents, x, y) in self.grid.coord_iter():
@@ -202,7 +212,7 @@ class SlimeModel(Model):
                 # Calculate differences
                 newDiag = ((self.grid[newx-1][newy-1])[0]).getAmt()
                 diff = ((self.grid[x-1][y-1])[0]).getAmt()
-                
+
                 # Fix if there are crazy values for diff
                 if diff > 10:
                     diff = 10
@@ -210,9 +220,9 @@ class SlimeModel(Model):
                     diff = -10
 
                 # Decide to move
-                if random.random() < np.exp(diff) / (1 + np.exp(diff)):                    
+                if random.random() < np.exp(diff) / (1 + np.exp(diff)):
                     agent.move(tuple([newx, newy]))
-                
+
                 # Layers for coloring agents based on density
                 agent.addLayer()
                 layer = agent.getLayer()
@@ -324,6 +334,19 @@ def cAMP_portrayal(agent):
 
     return portrayal
 
+# Create list of datacollectors
+collectors = list()
+
+coord = 0
+for x in range(masterHeight):
+    collectors.append({"Label": str(coord), "Color": "#85c6e7"})
+    coord += 1
+    print(collectors)
+
+# Create a bar chart to represent row amounts of relative to grid
+bar_chart_element = BarChartModule(collectors, canvas_width = 550)
+
+
 # Create a chart to represent total amount of cAMP on the grid
 chart_element = ChartModule([{"Label":"Total Amount of cAMP", "Color":"#85c6e7"}])
 
@@ -346,6 +369,6 @@ canvas_element = CanvasGrid(cAMP_portrayal, masterHeight, masterWidth, 550, 550)
 
 
 # Creating ModularServer
-server = ModularServer(SlimeModel, [canvas_element, chart_element], "Keller-Segel Slime Mold Aggregation Model", model_params)
+server = ModularServer(SlimeModel, [canvas_element, bar_chart_element, chart_element], "Keller-Segel Slime Mold Aggregation Model", model_params)
 # Launching Server
 server.launch()
