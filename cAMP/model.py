@@ -58,17 +58,18 @@ class SlimeModel(Model):
         # Initialize list of cAMP molecules
         self.cAMPs = list()
 
+        # Initialize dict for datacollector with total datacollector
         dc = {"Total Amount of cAMP": self.getAmts}
+        
+        # Initialize for iterating through columns (x) and rows (y)
+        self.x = 0
+#        self.y = 0
 
-        coord = 0
-
+        # Loop to fill datacollector dictionary with dict entries for each column
         for x in range(masterWidth):
-            dc.update({str(coord): self.getColAmts})
-            coord += 1
+            dc.update({str(x): self.getColAmts})
 
-        print(dc)
-
-        # Create datacollector to retrieve total amount of cAMP on the grid
+        # Create datacollector to retrieve total amounts of cAMP from dc dict created above
         self.datacollector = DataCollector(dc)
 
         # Variable for storing random numbers
@@ -109,10 +110,6 @@ class SlimeModel(Model):
                     # Increment j (unique_id variable)
                     self.j += 1
 
-        # Create environment variable as array filled with zeros w x w
-        self.env = np.zeros([self.w, self.w])
-        # Create next environemnt variable as array filled with zeros and dimensions w x w
-        self.nextenv = np.zeros([self.w, self.w])
         # Print out number of agents
         print("# of agents:", self.j)
 
@@ -130,25 +127,31 @@ class SlimeModel(Model):
 
     def getRowAmts(self):
         total = 0
-        y = 0
         for x in range(masterWidth):
             try:
-                total += self.grid.get_cell_list_contents((x, y))[0].getAmt()
+                total += self.grid.get_cell_list_contents((x, self.y))[0].getAmt()
             except IndexError:
-                print(str(y) + ", " + str(y))
-            y += 1
+                continue
+
+        if self.y == 49:
+            self.y = 0
+        else:
+            self.y += 1
 
         return total
 
     def getColAmts(self):
         total = 0
-        x = 0
-        for y in range(masterWidth):
+        for y in range(masterHeight):
             try:
-                total += self.grid.get_cell_list_contents((x, y))[0].getAmt()
+                total += self.grid.get_cell_list_contents((self.x, y))[0].getAmt()
             except IndexError:
-                print(str(x) + ", " + str(y))
-            x += 1
+                continue               
+
+        if self.x == 49:
+            self.x = 0
+        else:
+            self.x += 1
 
         return total
 
@@ -337,15 +340,14 @@ def cAMP_portrayal(agent):
 # Create list of datacollectors
 collectors = list()
 
+# Loop to create bars for bar graph
 coord = 0
 for x in range(masterHeight):
     collectors.append({"Label": str(coord), "Color": "#85c6e7"})
     coord += 1
-    print(collectors)
 
 # Create a bar chart to represent row amounts of relative to grid
-bar_chart_element = BarChartModule(collectors, canvas_width = 550)
-
+bar_chart_element_col = BarChartModule(collectors, canvas_width = 550)
 
 # Create a chart to represent total amount of cAMP on the grid
 chart_element = ChartModule([{"Label":"Total Amount of cAMP", "Color":"#85c6e7"}])
@@ -369,6 +371,6 @@ canvas_element = CanvasGrid(cAMP_portrayal, masterHeight, masterWidth, 550, 550)
 
 
 # Creating ModularServer
-server = ModularServer(SlimeModel, [canvas_element, bar_chart_element, chart_element], "Keller-Segel Slime Mold Aggregation Model", model_params)
+server = ModularServer(SlimeModel, [canvas_element, bar_chart_element_col, chart_element], "Keller-Segel Slime Mold Aggregation Model", model_params)
 # Launching Server
 server.launch()
