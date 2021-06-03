@@ -60,14 +60,15 @@ class SlimeModel(Model):
 
         # Initialize dict for datacollector with total datacollector
         dc = {"Total Amount of cAMP": self.getAmts}
-        
+
         # Initialize for iterating through columns (x) and rows (y)
         self.x = 0
-#        self.y = 0
+        self.y = 0
 
-        # Loop to fill datacollector dictionary with dict entries for each column
+        # Loop to fill datacollector dictionary with dict entries for each column and row
         for x in range(masterWidth):
-            dc.update({str(x): self.getColAmts})
+            dc.update({("x: " + str(x)): self.getColAmts})
+            dc.update({("y: " + str(x)): self.getRowAmts})
 
         # Create datacollector to retrieve total amounts of cAMP from dc dict created above
         self.datacollector = DataCollector(dc)
@@ -146,7 +147,7 @@ class SlimeModel(Model):
             try:
                 total += self.grid.get_cell_list_contents((self.x, y))[0].getAmt()
             except IndexError:
-                continue               
+                continue
 
         if self.x == 49:
             self.x = 0
@@ -338,16 +339,23 @@ def cAMP_portrayal(agent):
     return portrayal
 
 # Create list of datacollectors
-collectors = list()
+xCollectors = list()
+yCollectors = list()
 
-# Loop to create bars for bar graph
+# Loop to create bars for bar graphs
 coord = 0
 for x in range(masterHeight):
-    collectors.append({"Label": str(coord), "Color": "#85c6e7"})
+    xCollectors.append({"Label": ("x: " + str(coord)), "Color": "#85c6e7"})
     coord += 1
 
-# Create a bar chart to represent row amounts of relative to grid
-bar_chart_element_col = BarChartModule(collectors, canvas_width = 550)
+coord = 0
+for y in range(masterWidth):
+    yCollectors.append({"Label": ("y: " + str(coord)), "Color": "#85c6e7"})
+    coord += 1
+
+# Create a bar charts to represent column and row amounts of relative to grid
+bar_chart_element_col = BarChartModule(xCollectors, canvas_width = 550)
+bar_chart_element_row = BarChartModule(yCollectors, canvas_width = 550)
 
 # Create a chart to represent total amount of cAMP on the grid
 chart_element = ChartModule([{"Label":"Total Amount of cAMP", "Color":"#85c6e7"}])
@@ -371,6 +379,6 @@ canvas_element = CanvasGrid(cAMP_portrayal, masterHeight, masterWidth, 550, 550)
 
 
 # Creating ModularServer
-server = ModularServer(SlimeModel, [canvas_element, bar_chart_element_col, chart_element], "Keller-Segel Slime Mold Aggregation Model", model_params)
+server = ModularServer(SlimeModel, [canvas_element, bar_chart_element_col, bar_chart_element_row, chart_element], "Keller-Segel Slime Mold Aggregation Model", model_params)
 # Launching Server
 server.launch()
