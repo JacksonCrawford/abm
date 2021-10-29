@@ -11,7 +11,7 @@ import random
 import math
 
 import numpy as np
-from agents import SlimeAgent, cAMP, DataVis
+from agents import SlimeAgent, cAMP, DataVis, NumDataVis
 
 '''
     Change only the value of masterHeight to change the dimensions of the grid
@@ -19,7 +19,7 @@ from agents import SlimeAgent, cAMP, DataVis
 '''
 
 masterHeight = 50
-masterWidth = 51
+masterWidth = 52
 
 class SlimeModel(Model):
     def __init__(self, height, width, color, numAgents, gDense, kRate, dcDiffu, dhRes, dtRes, secRate):
@@ -51,6 +51,8 @@ class SlimeModel(Model):
         self.j = 0
         # Counter for DataVis agents' unique id's
         self.dv = 0
+        # Counter for NumDataVis agents' unique id's
+        self.ndv = 0
 
         # Create randomly ordered scheduler
         self.schedule = SimultaneousActivation(self)
@@ -99,6 +101,14 @@ class SlimeModel(Model):
 
                 # Increment unique id counter
                 self.dv += 1
+            elif x > 50:
+                # Create NumDataVis agent with appropriate slice num
+                ag = NumDataVis([x, y], self, self.ndv)
+                # Place NumDataVis agent
+                self.grid.place_agent(ag, tuple([x, y]))
+
+                # Increment unique id counter
+                self.ndv += 1
             else:
                 # Loop to create SlimeAgents
                 if self.gD % 1 != 0:
@@ -184,6 +194,21 @@ class SlimeModel(Model):
 
         return total
 
+    def sweepForClusters():
+        blacklist = list()
+        neighbors = list()
+        for (contents, x, y) in self.grid.coord_iter():
+            for agent in contents[1::]:
+                if type(agent) == SlimeAgent and agent not in blacklist:
+                    neighbors = agent.getNeighbors()
+                    for neighbor in neighbors:
+                        blacklist.append(neighbor)
+
+                '''
+                density = blacklist.length / density_coefficent_based_on_area
+                clusteredAgents = 
+                '''
+
     # Step method
     def step(self):
         cNeighbors = list()
@@ -195,6 +220,7 @@ class SlimeModel(Model):
         oldDiag = 0
         nAgents = 0
         layer = 1
+        secRate = 0
 
         ''' Perform cAMP decay and diffusion actions '''
         for (contents, x, y) in self.grid.coord_iter():
@@ -203,7 +229,7 @@ class SlimeModel(Model):
             cont = True
             for content in contents:
                 # Set row amounts if an object is DataVis
-                if type(content) is DataVis:
+                if type(content) is DataVis or type(content) is NumDataVis:
                     content.setRowAmt(self.getRowAmt(y))
                     cont = False
 
@@ -230,7 +256,7 @@ class SlimeModel(Model):
                 # Reassign lap to the laplacian (using previous neighbor sum value)
                 lap = (lap - 4 * amtSelf)/(self.Dh**2)
                 # Add decay to current cAMP object
-                cAMPobj.add((-self.k * amtSelf + self.Dc * lap) * self.Dt)
+                cAMPobj.add((-cAMPobj.getDecayRate() * amtSelf + self.Dc * lap) * self.Dt)
 
                 # Wipe cNeighbors
                 cNeighbors.clear()
@@ -246,7 +272,7 @@ class SlimeModel(Model):
                             cNeighbors.append(neighbor)
 
                     # Add cAMP secretion to the cell that the agent shares with a cAMP object
-                    cAMPobj.add(self.f * self.Dt)
+                    cAMPobj.add(agent.getSecRate() * self.Dt)
                     # Decide whether or not to move
                     newx = (x + random.randint(-1, 2)) % self.w
                     newy = (y + random.randint(-1, 2)) % self.w
@@ -280,7 +306,7 @@ class SlimeModel(Model):
         # Collect new data
         self.datacollector.collect(self)
 
-
+    # Method to select a color based on the topmost agent
     def pickColor(self, topAgent, nAgents):
         shade = topAgent.getShades()
         if nAgents <= 2:
@@ -380,6 +406,14 @@ def cAMP_portrayal(agent):
         portrayal["x"] = agent.getX()
         portrayal["y"] = agent.getY()
         portrayal["Color"] = agent.getColor()
+
+    elif type(agent) is NumDataVis:
+        portrayal = {"Shape": "rect", "w": 1.5, "h": 1, "Filled": "true", "Layer": 1}
+        portrayal["x"] = agent.getX()
+        portrayal["y"] = agent.getY()
+        portrayal["Color"] = "#ffffff"
+        portrayal["text"] = agent.getNum()
+        portrayal["text_color"] = "#000000"
 
     return portrayal
 

@@ -1,12 +1,13 @@
 from mesa import Agent
 import mesa.space
+from colour import Color
 
 # Agent for visualizing row amounts of cAMP
 class DataVis(Agent):
     def __init__(self, pos, model, unique_id):
         self.pos = pos
         self.rowAmt = 0
-        self.color = "#ffffff"
+        self.color = Color("blue")
 
     # Method to get X coord
     def getX(self):
@@ -29,64 +30,99 @@ class DataVis(Agent):
         # Change increment size here (a bit buggy :/)
         inc = 1
 
-        if self.rowAmt < inc:
-            self.color = "#ffffff"
-        elif self.rowAmt < (2 * inc):
-            self.color = "#e5ebef"
-        elif self.rowAmt < (3 * inc):
-            self.color = "#dce7ee"
-        elif self.rowAmt < (4 * inc):
-            self.color = "#d6e6fo"
-        elif self.rowAmt < (5 * inc):
-            self.color = "#cee2ef"
-        elif self.rowAmt < (6 * inc):
-            self.color = "#c7dfef"
-        elif self.rowAmt < (7 * inc):
-            self.color = "#bedbef"
-        elif self.rowAmt < (8 * inc):
-            self.color = "#b6d7ed"
-        elif self.rowAmt < (9 * inc):
-            self.color = "#b0d5ee"
-        elif self.rowAmt < (10 * inc):
-            self.color = "#abd4ef"
-        elif self.rowAmt < (11 * inc):
-            self.color = "#a2d0ef"
-        elif self.rowAmt < (12 * inc):
-            self.color = "#97caec"
-        elif self.rowAmt < (13 * inc):
-            self.color = "#8fc7ec"
-        elif self.rowAmt < (14 * inc):
-            self.color = "#88c5ee"
-        elif self.rowAmt < (15 * inc):
-            self.color = "#81c3ef"
-        elif self.rowAmt < (16 * inc):
-            self.color = "#77beee"
-        elif self.rowAmt < (17 * inc):
-            self.color = "#71bcef"
-        elif self.rowAmt < (18 * inc):
-            self.color = "#67b5eb"
-        elif self.rowAmt < (19 * inc):
-            self.color = "#60b1e9"
-        elif self.rowAmt < (20 * inc):
-            self.color = "#5bb0eb"
-        elif self.rowAmt < (21 * inc):
-            self.color = "#53acea"
-        elif self.rowAmt < (22 * inc):
-            self.color = "#48a5e7"
-        elif self.rowAmt < (23 * inc):
-            self.color = "#40a2e7"
-        elif self.rowAmt < (24 * inc):
-            self.color = "#389ee6"
-        elif self.rowAmt < (25 * inc):
-            self.color = "#2f9ce8"
-        elif self.rowAmt < (26 * inc):
-            self.color = "#2a9bea"
-        elif self.rowAmt < (27 * inc):
-            self.color = "#1f95e7"
+        '''formula = (self.rowAmt * .025) / inc
+        if formula > 1:
+            self.color.saturation = formula
         else:
-            self.color = "#000000"
+            self.color = Color("red")'''
 
-        return self.color
+        if self.rowAmt < inc:
+            self.color.saturation = 0.027
+        elif self.rowAmt < (2 * inc):
+            self.color.saturation = 0.054
+        elif self.rowAmt < (3 * inc):
+            self.color.saturation = 0.081
+        elif self.rowAmt < (4 * inc):
+            self.color.saturation = 0.108
+        elif self.rowAmt < (5 * inc):
+            self.color.saturation = 0.135
+        elif self.rowAmt < (6 * inc):
+            self.color.saturation = 0.162
+        elif self.rowAmt < (7 * inc):
+            self.color.saturation = 0.189
+        elif self.rowAmt < (8 * inc):
+            self.color.saturation = 0.216
+        elif self.rowAmt < (9 * inc):
+            self.color.saturation = 0.143
+        elif self.rowAmt < (10 * inc):
+            self.color.saturation = 0.27
+        elif self.rowAmt < (11 * inc):
+            self.color.saturation = 0.297
+        elif self.rowAmt < (12 * inc):
+            self.color.saturation = 0.324
+        elif self.rowAmt < (13 * inc):
+            self.color.saturation = 0.351
+        elif self.rowAmt < (14 * inc):
+            self.color.saturation = 0.378
+        elif self.rowAmt < (15 * inc):
+            self.color.saturation = 0.405
+        elif self.rowAmt < (16 * inc):
+            self.color.saturation = 0.432
+        elif self.rowAmt < (17 * inc):
+            self.color.saturation = 0.459
+        elif self.rowAmt < (18 * inc):
+            self.color.saturation = 0.486
+        elif self.rowAmt < (19 * inc):
+            self.color.saturation = 0.513
+        elif self.rowAmt < (20 * inc):
+            self.color.saturation = 0.540
+        elif self.rowAmt < (21 * inc):
+            self.color.saturation = 0.567
+        elif self.rowAmt < (22 * inc):
+            self.color.saturation = 0.594
+        elif self.rowAmt < (23 * inc):
+            self.color.saturation = 0.621
+        elif self.rowAmt < (24 * inc):
+            self.color.saturation = 0.648
+        elif self.rowAmt < (25 * inc):
+            self.color.saturation = 0.675
+        elif self.rowAmt < (26 * inc):
+            self.color.saturation = 0.702
+        elif self.rowAmt < (27 * inc):
+            self.color.saturation = 0.729
+        else:
+            self.color = Color("black")
+
+        return self.color.hex_l
+
+# Agent to represent numerical data of row amounts of cAMP alongside color
+class NumDataVis:
+    def __init__(self, pos, model, unique_id):
+        self.pos = pos
+        self.rowAmt = 0
+        self.color = Color("blue")
+
+    # Method to get X coord
+    def getX(self):
+        return self.pos[0]
+
+    # Method to get Y coord
+    def getY(self):
+        return self.pos[1]
+
+    # Method to get the row amount value
+    def getRowAmt(self):
+        return self.rowAmt
+
+    # Method to set the row amount for color decisions
+    def setRowAmt(self, amt):
+        self.rowAmt = amt
+
+    # Method to get the sliced number for rowAmt
+    def getNum(self):
+        amt = str(self.rowAmt)
+        return amt[0:4:]
+
 
 # cAMP agent, one is assigned per cell and it has the amoumt of cAMP
 class cAMP(Agent):
@@ -94,6 +130,7 @@ class cAMP(Agent):
         super().__init__(unique_id, model)
         self.pos = pos
         self.amount = amount
+        self.decay = 1
 
     # Get X coordinate of agent
     def getX(self):
@@ -107,6 +144,10 @@ class cAMP(Agent):
     def getAmt(self):
         return self.amount
 
+    # Get decay rate
+    def getDecayRate(self):
+        return self.decay
+
     # Add some amount of cAMP
     def add(self, amt):
         if (self.amount + amt) > 0:
@@ -117,6 +158,11 @@ class cAMP(Agent):
     # Get immediate neighbors without center or diagonals
     def getNeighbors(self):
         return self.model.grid.get_neighbors(self.pos, moore=False, include_center=False, radius=1)
+
+
+    # Set decay rate
+    def setDecayRate(self, drParam):
+        self.decay = drParam
 
 # Slime Mold agent that interacts with the environment made up of cAMP agents
 class SlimeAgent(Agent):
@@ -132,6 +178,8 @@ class SlimeAgent(Agent):
             self.shade = "#00741c"
         else:
             self.shade = "#4a7d8e"
+
+        self.secRate = 1
 
         self.layer = 1
 
@@ -168,6 +216,14 @@ class SlimeAgent(Agent):
     def getLayer(self):
         return self.layer
 
+    # Get secretion rate
+    def getSecRate(self):
+        return self.secRate;
+
+    # Get immediate neighbors without center or diagonals
+    def getNeighbors(self):
+        return self.model.grid.get_neighbors(self.pos, moore=False, include_center=False, radius=1)
+
     # Increment layer by 1
     def addLayer(self):
         self.layer += 1
@@ -184,9 +240,9 @@ class SlimeAgent(Agent):
     def setY(self, yParam):
         self.y = yParam
 
-    # Get immediate neighbors without center or diagonals
-    def getNeighbors(self):
-        return self.model.grid.get_neighbors(self.pos, moore=False, include_center=False, radius=1)
+    # Set secretion rate
+    def setSecRate(self, srParam):
+        self.secRate = srParam
 
     # Move to a specified position
     def move(self, newPos):

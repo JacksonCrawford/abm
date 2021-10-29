@@ -5,21 +5,23 @@ from mesa.datacollection import DataCollector
 
 from mesa.visualization.modules import CanvasGrid, ChartModule, BarChartModule
 from mesa.visualization.ModularVisualization import ModularServer
+import mesa.visualization.TextVisualization
 from mesa.visualization.UserParam import UserSettableParameter
 
 import random
 import math
 
 import numpy as np
-from agents import SlimeAgent, cAMP
+from agents import SlimeAgent, cAMP, DataVis, NumDataVis
 
 '''
     Change only the value of masterHeight to change the dimensions of the grid
         because it must always be a square.
 '''
 
-masterHeight = 50
+masterHeight = 15
 masterWidth = masterHeight
+#masterWidth = 52
 
 class SlimeModel(Model):
     def __init__(self, height, width, color, numAgents, gDense, kRate, dcDiffu, dhRes, dtRes, secRate):
@@ -28,7 +30,7 @@ class SlimeModel(Model):
         # grid density
         self.gD = gDense
         # rate of cAMP decay
-        self.k = kRate
+        self.k = 0.1
         # diffusion constant of cAMP
         self.Dc = dcDiffu
         # spatial resolution for cAMP simulation
@@ -47,13 +49,26 @@ class SlimeModel(Model):
         # width of grid
         self.width = masterWidth
 
-        # counter for generating sequential unique id's
+        # Counter for generating sequential unique id's
         self.j = 0
+        # Counter for DataVis agents' unique id's
+        self.dv = 0
+        # Counter for NumDataVis agents' unique id's
+        self.ndv = 0
+
+        # Blacklist for agents in clustering
+        self.blacklist = list()
+        # List for current cluser agents
+        self.cluster_agents = list()
+        # List for cluster neighbors
+        self.cluster_neighbors = list()
+        # List to check how many cells have been examined during cluster detection
+        self.cells = 0
 
         # Create randomly ordered scheduler
         self.schedule = SimultaneousActivation(self)
         # Create grid (of type MultiGrid to support multiple agents per cell
-        self.grid = MultiGrid(self.height, self.width, torus=False)
+        self.grid = MultiGrid(self.width, self.height, torus=False)
 
         # Initialize list of cAMP molecules
         self.cAMPs = list()
@@ -79,7 +94,7 @@ class SlimeModel(Model):
         # Initial loop to create agents and fill agents list with them
         for (contents, x, y) in self.grid.coord_iter():
             # Create object of type cAMP
-            cell = cAMP([x, y], self, self.j, 0)
+            cell = cAMP([x, y], self, self.j, 0, self.k)
             # Add random amoutn of cAMP to cell (<1)
             cell.add(random.random())
             # Place cAMP onto grid at coordinates x, y
@@ -87,29 +102,50 @@ class SlimeModel(Model):
             # Add cAMP molecule to list
             self.cAMPs.append(cell)
 
-            # Loop to create SlimeAgents
-            if self.gD % 1 != 0:
-                r = random.random()
-                if r <= self.gD:
+            # print("x:", x, " y:", y)
+
+            if x == 50:
+                # Create DataVis agent
+                ag = DataVis([x, y], self, self.dv)
+                # Place DataVis agent
+                self.grid.place_agent(ag, tuple([x, y]))
+
+                # Increment unique id counter
+                self.dv += 1
+            elif x > 50:
+                # Create NumDataVis agent with appropriate slice num
+                ag = NumDataVis([x, y], self, self.ndv)
+                # Place NumDataVis agent
+                self.grid.place_agent(ag, tuple([x, y]))
+
+                # Increment unique id counter
+                self.ndv += 1
+            else:
+                # Loop to create SlimeAgents
+                if self.gD % 1 != 0:
+                    r = random.random()
+                    if r <= self.gD:
+                        for i in range(self.n):
+                            # Create object of type SlimeAgent
+                            ag = SlimeAgent([x, y], self, self.j, 10, self.color)
+                            ag.setSecRate(5)
+                            # Place agent onto grid at coordinates x, y
+                            self.grid.place_agent(ag, tuple([x, y]))
+                            # Add agent to schedule
+                            self.schedule.add(ag)
+                            # Increment j (unique_id variable)
+                            self.j += 1
+                else:
                     for i in range(self.n):
                         # Create object of type SlimeAgent
-                        ag = SlimeAgent([x, y], self, self.j, self.color)
+                        ag = SlimeAgent([x, y], self, self.j, 10, self.color)
+                        ag.setSecRate(5)
                         # Place agent onto grid at coordinates x, y
                         self.grid.place_agent(ag, tuple([x, y]))
                         # Add agent to schedule
                         self.schedule.add(ag)
                         # Increment j (unique_id variable)
                         self.j += 1
-            else:
-                for i in range(self.n):
-                    # Create object of type SlimeAgent
-                    ag = SlimeAgent([x, y], self, self.j, self.color)
-                    # Place agent onto grid at coordinates x, y
-                    self.grid.place_agent(ag, tuple([x, y]))
-                    # Add agent to schedule
-                    self.schedule.add(ag)
-                    # Increment j (unique_id variable)
-                    self.j += 1
 
         # Print out number of agents
         print("# of agents:", self.j)
@@ -141,6 +177,21 @@ class SlimeModel(Model):
 
         return total
 
+    def getRowAmt(self, y):
+        total = 0
+        for x in range(masterWidth - 1):
+            try:
+                total += self.grid.get_cell_list_contents((x, y))[0].getAmt()
+            except IndexError:
+                continue
+
+        if self.y == 49:
+            self.y = 0
+        else:
+            self.y += 1
+
+        return total
+
     def getColAmts(self):
         total = 0
         for y in range(masterHeight):
@@ -156,6 +207,41 @@ class SlimeModel(Model):
 
         return total
 
+    # Method to determine if a given area has a cluster in it
+    def checkForCluster(self):
+#        print("cluster_agents len: ", len(self.cluster_agents), " | cells: ", self.cells)
+
+        # Return true if the amount of agents in an area divided by that area is greater than .2
+        if self.cells > 0 and len(self.cluster_agents) / self.cells > .2:
+            return True
+
+        return False
+
+    # Method to sweep the grid for clusters
+    def sweepForClusters(self):
+        for (contents, x, y) in self.grid.coord_iter():
+            self.cells += 1
+            if len(contents) == 1:
+                break
+
+            for agent in contents:
+                if agent not in self.blacklist and type(agent) is SlimeAgent:
+#                    print(agent)
+                    self.cluster_neighbors = agent.getSlimeNeighbors()
+#                    print(self.cluster_neighbors)
+                    self.cluster_agents.append(self.cluster_neighbors)
+                    self.blacklist.append(self.cluster_neighbors)
+                    self.cells += len(self.cluster_neighbors)
+
+
+
+#            if self.checkForCluster() :
+#                print("cluster: origin @ (", x, ", ", y, ")")
+            self.cluster_agents.clear()
+            self.cells = 0
+
+        self.blacklist.clear()
+
     # Step method
     def step(self):
         cNeighbors = list()
@@ -167,99 +253,111 @@ class SlimeModel(Model):
         oldDiag = 0
         nAgents = 0
         layer = 1
+        secRate = 0
 
         ''' Perform cAMP decay and diffusion actions '''
         for (contents, x, y) in self.grid.coord_iter():
-            # Initialize number of agents for layer coloring
-            nAgents = len(contents) - 1
-            # Reset lap to 0
-            lap = 0 
 
-            # Set cAMPobj to current tile's cAMP agent
-            cAMPobj = contents[0]
-            # Set neighbors to cAMPobj's neighbors (Von Neumann)
-            neighbors = cAMPobj.getNeighbors()
-            # Add cAMP objects form neighbors to cNeighbors
-            for neighbor in neighbors:
-                if type(neighbor) is cAMP:
-                    cNeighbors.append(neighbor)
+            # This block is a bit messy but it works for now
+            cont = True
+            for content in contents:
+                # Set row amounts if an object is DataVis
+                if type(content) is DataVis or type(content) is NumDataVis:
+                    content.setRowAmt(self.getRowAmt(y))
+                    cont = False
 
-            # Add sum of neighbors to lap
-            for mol in cNeighbors:
-                lap += mol.getAmt()
+            if cont:
+                # Initialize number of agents for layer coloring
+                nAgents = len(contents) - 1
+                # Reset lap to 0
+                lap = 0
 
-            amtSelf = cAMPobj.getAmt()
-            # Reassign lap to the laplacian (using previous neighbor sum value)
-            lap = (lap - 4 * amtSelf)/(self.Dh**2)
-            # Add decay to current cAMP object
-            cAMPobj.add((-self.k * amtSelf + self.Dc * lap) * self.Dt)
-
-            # Wipe cNeighbors
-            cNeighbors.clear()
-
-            # Iterate through all contents of a grid cell
-            for agent in contents[1::]:
-                # Get all neighbors (excuding self)
-                neighbors = agent.getNeighbors()
-                # Examine each neighbor
+                # Set cAMPobj to current tile's cAMP agent
+                cAMPobj = contents[0]
+                # Set neighbors to cAMPobj's neighbors (Von Neumann)
+                neighbors = cAMPobj.getNeighbors()
+                # Add cAMP objects form neighbors to cNeighbors
                 for neighbor in neighbors:
-                    # Add cAMP neighbors to list
                     if type(neighbor) is cAMP:
                         cNeighbors.append(neighbor)
 
-                # Add cAMP secretion to the cell that the agent shares with a cAMP object
-                cAMPobj.add(self.f * self.Dt)
-                # Decide whether or not to move
-                newx = (x + random.randint(-1, 2)) % self.w
-                newy = (y + random.randint(-1, 2)) % self.w
+                # Add sum of neighbors to lap
+                for mol in cNeighbors:
+                    lap += mol.getAmt()
 
-                # Calculate differences
-                newDiag = ((self.grid[newx-1][newy-1])[0]).getAmt()
-                diff = ((self.grid[x-1][y-1])[0]).getAmt()
-
-                # Fix if there are crazy values for diff
-                if diff > 10:
-                    diff = 10
-                elif diff < 10:
-                    diff = -10
-
-                # Decide to move
-                if random.random() < np.exp(diff) / (1 + np.exp(diff)):
-                    agent.move(tuple([newx, newy]))
-
-                # Layers for coloring agents based on density
-                agent.addLayer()
-                layer = agent.getLayer()
-                # Only change color of agent that is on top of a stack
-                if layer >= nAgents:
-                    self.pickColor(agent, nAgents)
+                amtSelf = cAMPobj.getAmt()
+                # Reassign lap to the laplacian (using previous neighbor sum value)
+                lap = (lap - 4 * amtSelf)/(self.Dh**2)
+                # Add decay to current cAMP object
+                cAMPobj.add((-cAMPobj.getDecayRate() * amtSelf + self.Dc * lap) * self.Dt)
 
                 # Wipe cNeighbors
                 cNeighbors.clear()
+
+                # Iterate through all contents of a grid cell
+                for agent in contents[1::]:
+                    # Get all neighbors (excuding self)
+                    neighbors = agent.getNeighbors()
+                    # Examine each neighbor
+                    for neighbor in neighbors:
+                        # Add cAMP neighbors to list
+                        if type(neighbor) is cAMP:
+                            cNeighbors.append(neighbor)
+
+                    # Add cAMP secretion to the cell that the agent shares with a cAMP object
+                    cAMPobj.add(agent.getSecRate() * self.Dt)
+                    # Decide whether or not to move
+                    newx = (x + random.randint(-1, 2)) % self.w
+                    newy = (y + random.randint(-1, 2)) % self.w
+
+                    # Calculate differences
+                    newDiag = ((self.grid[newx-1][newy-1])[0]).getAmt()
+                    diff = ((self.grid[x-1][y-1])[0]).getAmt()
+
+                    # Fix if there are crazy values for diff
+                    if diff > 10:
+                        diff = 10
+                    elif diff < -10:
+                        diff = -10
+
+                    # Decide to move
+                    if random.random() < np.exp(diff) / (1 + np.exp(diff)):
+                        agent.move(tuple([newx, newy]))
+
+                    # Layers for coloring agents based on density
+                    agent.addLayer()
+                    layer = agent.getLayer()
+                    # Only change color of agent that is on top of a stack
+                    self.pickColor(agent, nAgents)
+
+                    # Wipe cNeighbors
+                    cNeighbors.clear()
+
+                    self.sweepForClusters()
 
         # Add step to schedule
         self.schedule.step()
         # Collect new data
         self.datacollector.collect(self)
 
-
+    # Method to select a color based on the topmost agent
     def pickColor(self, topAgent, nAgents):
         shade = topAgent.getShades()
-        if nAgents <= 2:
+        if nAgents == 1:
             topAgent.setShade(shade[0])
-        elif nAgents == 3:
+        elif nAgents == 2:
             topAgent.setShade(shade[1])
-        elif nAgents == 4:
+        elif nAgents == 3:
             topAgent.setShade(shade[2])
-        elif nAgents == 5:
+        elif nAgents == 4:
             topAgent.setShade(shade[3])
-        elif nAgents == 6:
+        elif nAgents == 5:
             topAgent.setShade(shade[4])
-        elif nAgents == 7:
+        elif nAgents == 6:
             topAgent.setShade(shade[5])
-        elif nAgents == 8:
+        elif nAgents == 7:
             topAgent.setShade(shade[6])
-        elif nAgents == 9:
+        elif nAgents == 8:
             topAgent.setShade(shade[7])
 
 
@@ -276,8 +374,9 @@ def cAMP_portrayal(agent):
         portrayal["x"] = agent.getX()
         # Setting y coordinate of agent in portrayal dict
         portrayal["y"] = agent.getY()
-        # Setting agent color to red 
+        # Setting agent color to red
         portrayal["Color"] = agent.getShade()
+
     elif type(agent) is cAMP:
         # Dictionary for setting portrayal settings of cAMP agent
         portrayal = {"Shape": "rect", "w": 1, "h": 1, "Filled": "true", "Layer": 0}
@@ -336,6 +435,20 @@ def cAMP_portrayal(agent):
         else:
             portrayal["Color"] = "#000000"
 
+    elif type(agent) is DataVis:
+        portrayal = {"Shape": "rect", "w": 1, "h": 1, "Filled": "true", "Layer": 1}
+        portrayal["x"] = agent.getX()
+        portrayal["y"] = agent.getY()
+        portrayal["Color"] = agent.getColor()
+
+    elif type(agent) is NumDataVis:
+        portrayal = {"Shape": "rect", "w": 1.5, "h": 1, "Filled": "true", "Layer": 1}
+        portrayal["x"] = agent.getX()
+        portrayal["y"] = agent.getY()
+        portrayal["Color"] = "#ffffff"
+        portrayal["text"] = agent.getNum()
+        portrayal["text_color"] = "#000000"
+
     return portrayal
 
 # Create list of datacollectors
@@ -354,8 +467,8 @@ for y in range(masterWidth):
     coord += 1
 
 # Create a bar charts to represent column and row amounts of relative to grid
-bar_chart_element_col = BarChartModule(xCollectors, canvas_width = 550)
-bar_chart_element_row = BarChartModule(yCollectors, canvas_width = 550)
+#bar_chart_element_col = BarChartModule(xCollectors, canvas_width = 550)
+#bar_chart_element_row = BarChartModule(yCollectors, canvas_width = 550)
 
 # Create a chart to represent total amount of cAMP on the grid
 chart_element = ChartModule([{"Label":"Total Amount of cAMP", "Color":"#85c6e7"}])
@@ -363,7 +476,7 @@ chart_element = ChartModule([{"Label":"Total Amount of cAMP", "Color":"#85c6e7"}
 # Setting size of model
 model_params = {
         "height": 200,
-        "width": 200,
+        "width": 220,
         "numAgents": UserSettableParameter("slider", "Number of Agents", 1, 1, 10, 1),
         "gDense": UserSettableParameter("slider", "Density of Agents on Grid", .5, 0, 1, .1),
         "kRate": UserSettableParameter("slider", "Rate of cAMP decay", 1, 0, 5, .5),
@@ -375,10 +488,11 @@ model_params = {
         }
 
 # Create grid for agents of size 550px x 550px, with 50 tiles along x and 50 along y
-canvas_element = CanvasGrid(cAMP_portrayal, masterHeight, masterWidth, 550, 550)
+canvas_element = CanvasGrid(cAMP_portrayal, masterWidth, masterHeight, 550, 550)
 
 
 # Creating ModularServer
-server = ModularServer(SlimeModel, [canvas_element, bar_chart_element_col, bar_chart_element_row, chart_element], "Keller-Segel Slime Mold Aggregation Model", model_params)
+#server = ModularServer(SlimeModel, [canvas_element, bar_chart_element_col, bar_chart_element_row, chart_element], "Keller-Segel Slime Mold Aggregation Model", model_params)
+server = ModularServer(SlimeModel, [canvas_element, chart_element], "Keller-Segel Slime Mold Aggregation Model", model_params)
 # Launching Server
 server.launch()
